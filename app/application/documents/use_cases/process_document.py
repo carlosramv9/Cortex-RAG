@@ -1,11 +1,13 @@
-"""Use case: process a document (parse -> chunk -> embed -> index)."""
+"""Use case: process a document (parse -> render pages -> chunk -> embed -> index).
+
+Reserved for a later phase. Dependencies are declared as domain ports; the
+orchestration is not implemented yet.
+"""
 
 from __future__ import annotations
 
-from app.application.documents.dtos import (
-    ProcessDocumentInput,
-    ProcessDocumentOutput,
-)
+from uuid import UUID
+
 from app.domain.chunking.services import ChunkingStrategy
 from app.domain.documents.repositories import DocumentRepository
 from app.domain.embeddings.providers import EmbeddingProvider
@@ -15,7 +17,7 @@ from app.domain.vector_store.repositories import VectorRepository
 
 
 class ProcessDocumentUseCase:
-    """Turn a stored document into indexed, searchable chunks."""
+    """Turn a stored document into indexed, searchable chunks (not implemented)."""
 
     def __init__(
         self,
@@ -33,6 +35,6 @@ class ProcessDocumentUseCase:
         self._embeddings = embeddings
         self._vectors = vectors
 
-    async def execute(self, data: ProcessDocumentInput) -> ProcessDocumentOutput:
+    async def execute(self, tenant_id: str, document_id: UUID) -> None:
         """Execute the use case."""
         raise NotImplementedError

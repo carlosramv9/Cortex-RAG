@@ -29,6 +29,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "import-linter>=2.1",
     "asgi-lifespan>=2.1.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [build-system]
@@ -123,8 +124,18 @@ forbidden_modules = [
     "app.api",
     "app.application",
     "app.infrastructure",
+    "app.workers",
     "fastapi",
     "sqlalchemy",
+]
+
+[[tool.importlinter.contracts]]
+name = "Workers know nothing about the web"
+type = "forbidden"
+source_modules = ["app.workers"]
+forbidden_modules = [
+    "app.api",
+    "fastapi",
 ]
 
 [[tool.importlinter.contracts]]

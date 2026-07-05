@@ -14,10 +14,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
 from app.config.settings import get_settings
+from app.infrastructure.persistence.sqlalchemy import models  # noqa: F401
 from app.infrastructure.persistence.sqlalchemy.base import Base
 
-# Import models so their tables register on Base.metadata (none yet).
-# e.g. from app.infrastructure.persistence.sqlalchemy import models  # noqa
+# ``models`` is imported for its side effect: registering tables on
+# Base.metadata so Alembic autogeneration can see them.
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().db.async_dsn)

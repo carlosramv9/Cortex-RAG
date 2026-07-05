@@ -115,6 +115,47 @@ class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="STORAGE_", extra="ignore")
 
     local_path: str = "./storage"
+    page_image_format: str = "webp"
+
+
+class UploadSettings(BaseSettings):
+    """Document upload validation policy.
+
+    List fields use ``NoDecode`` + the reusable ``parse_str_list`` parser so
+    envs accept both comma-separated and JSON-array formats.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="UPLOAD_", extra="ignore")
+
+    max_size_mb: int = 50
+    allowed_extensions: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["pdf"])
+    allowed_mime_types: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["application/pdf"]
+    )
+
+    @field_validator("allowed_extensions", "allowed_mime_types", mode="before")
+    @classmethod
+    def _parse_lists(cls, value: object) -> object:
+        return parse_str_list(value)
+
+    @field_validator("allowed_extensions", mode="after")
+    @classmethod
+    def _normalize_extensions(cls, value: list[str]) -> list[str]:
+        return [ext.lstrip(".").lower() for ext in value]
+
+    @property
+    def max_size_bytes(self) -> int:
+        return self.max_size_mb * 1024 * 1024
+
+
+class ProcessingSettings(BaseSettings):
+    """Asynchronous processing pipeline settings."""
+
+    model_config = SettingsConfigDict(env_prefix="PROCESSING_", extra="ignore")
+
+    max_retries: int = 3
+    default_priority: int = 0
+    dispatch_batch_size: int = 10
 
 
 class Settings(BaseSettings):
@@ -132,6 +173,8 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    upload: UploadSettings = Field(default_factory=UploadSettings)
+    processing: ProcessingSettings = Field(default_factory=ProcessingSettings)
 
 
 @lru_cache(maxsize=1)
