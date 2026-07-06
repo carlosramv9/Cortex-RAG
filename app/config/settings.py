@@ -83,30 +83,51 @@ class DatabaseSettings(BaseSettings):
 
 
 class VectorSettings(BaseSettings):
-    """Qdrant settings (reserved — not wired yet)."""
+    """Qdrant settings."""
 
     model_config = SettingsConfigDict(env_prefix="VECTOR_", extra="ignore")
 
     host: str = "localhost"
     port: int = 6333
     collection: str = "knowledge_chunks"
+    # Must match EmbeddingSettings' model output dimension; the collection is
+    # created with a fixed vector size, so changing the embedding model
+    # requires a new collection (or a re-index into it).
+    vector_size: int = 1024
 
 
-class LLMSettings(BaseSettings):
-    """LLM + embeddings settings (Ollama, external — reserved)."""
+class GeminiSettings(BaseSettings):
+    """Gemini LLM settings (chat/answer pipeline)."""
 
-    model_config = SettingsConfigDict(env_prefix="LLM_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="GEMINI_", extra="ignore")
 
-    base_url: str = "http://localhost:11434"
-    model: str = "llama3.1"
+    api_key: str = ""
+    model: str = "gemini-3.5-flash"
+
+
+class ChatSettings(BaseSettings):
+    """RAG chat settings."""
+
+    model_config = SettingsConfigDict(env_prefix="CHAT_", extra="ignore")
+
+    # Number of most-recent messages (both roles) sent to the LLM as memory.
+    history_window: int = 20
+    system_prompt: str = (
+        "You are a helpful assistant. Answer only using the provided context. "
+        "If the context does not contain the answer, say you don't know."
+    )
 
 
 class EmbeddingSettings(BaseSettings):
-    """Embedding provider settings (reserved)."""
+    """Embedding provider settings (local fastembed model)."""
 
     model_config = SettingsConfigDict(env_prefix="EMBEDDING_", extra="ignore")
 
-    model: str = "bge-m3"
+    # Multilingual (covers the languages allowed by KnowledgeMetadata, incl. es/en).
+    # See `fastembed.TextEmbedding.list_supported_models()` for alternatives.
+    model: str = "intfloat/multilingual-e5-large"
+    # Output vector size for `model`. Must match VectorSettings.vector_size.
+    dimension: int = 1024
 
 
 class StorageSettings(BaseSettings):
@@ -155,7 +176,26 @@ class ProcessingSettings(BaseSettings):
 
     max_retries: int = 3
     default_priority: int = 0
-    dispatch_batch_size: int = 10
+
+
+class RabbitMQSettings(BaseSettings):
+    """RabbitMQ settings — the actual processing-job queue (push-based)."""
+
+    model_config = SettingsConfigDict(env_prefix="RABBITMQ_", extra="ignore")
+
+    host: str = "localhost"
+    port: int = 5672
+    user: str = "guest"
+    password: str = "guest"
+    queue: str = "processing_jobs"
+    # Max unacknowledged messages the worker consumer holds at once.
+    prefetch_count: int = 10
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def url(self) -> str:
+        """AMQP connection URL for aio-pika."""
+        return f"amqp://{self.user}:{self.password}@{self.host}:{self.port}/"
 
 
 class Settings(BaseSettings):
@@ -170,11 +210,13 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     vector: VectorSettings = Field(default_factory=VectorSettings)
-    llm: LLMSettings = Field(default_factory=LLMSettings)
+    gemini: GeminiSettings = Field(default_factory=GeminiSettings)
+    chat: ChatSettings = Field(default_factory=ChatSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     upload: UploadSettings = Field(default_factory=UploadSettings)
     processing: ProcessingSettings = Field(default_factory=ProcessingSettings)
+    rabbitmq: RabbitMQSettings = Field(default_factory=RabbitMQSettings)
 
 
 @lru_cache(maxsize=1)

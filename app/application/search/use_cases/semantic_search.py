@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from app.application.search.dtos import SearchInput, SearchOutput
-from app.domain.embeddings.providers import EmbeddingProvider
+from app.application.search.dtos import SearchHit, SearchInput, SearchOutput
+from app.domain.embeddings.providers import EmbeddingProvider, EmbeddingTaskType
 from app.domain.vector_store.repositories import VectorRepository
 
 
@@ -19,5 +19,20 @@ class SemanticSearchUseCase:
         self._vectors = vectors
 
     async def execute(self, data: SearchInput) -> SearchOutput:
-        """Execute the use case."""
-        raise NotImplementedError
+        embedding = await self._embeddings.embed_text(
+            data.query, task_type=EmbeddingTaskType.QUERY
+        )
+        results = await self._vectors.search(
+            embedding.vector,
+            limit=data.top_k,
+            filters={"tenant_id": data.tenant_id},
+        )
+        hits = [
+            SearchHit(
+                chunk_id=result.id,
+                score=result.score,
+                content=str(result.payload.get("content", "")),
+            )
+            for result in results
+        ]
+        return SearchOutput(hits=hits)

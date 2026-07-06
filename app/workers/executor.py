@@ -14,6 +14,7 @@ from app.domain.documents.events import (
     ProcessingJobFailed,
     ProcessingJobStarted,
 )
+from app.domain.documents.job_queue import JobQueue
 from app.domain.documents.jobs import ProcessingJob
 from app.domain.documents.repositories import ProcessingJobRepository
 from app.domain.shared.event_publisher import EventPublisher
@@ -28,12 +29,14 @@ class WorkerExecutor:
         jobs: ProcessingJobRepository,
         events: EventPublisher,
         registry: WorkerRegistry,
+        queue: JobQueue,
         *,
         max_retries: int = 3,
     ) -> None:
         self._jobs = jobs
         self._events = events
         self._registry = registry
+        self._queue = queue
         self._max_retries = max_retries
 
     async def execute(self, job: ProcessingJob) -> ProcessingJob:
@@ -62,6 +65,7 @@ class WorkerExecutor:
             if job.can_retry(self._max_retries):
                 job.retry()
                 await self._jobs.update(job)
+                await self._queue.enqueue(tenant_id=job.tenant_id, job_id=job.id)
             else:
                 await self._jobs.update(job)
                 await self._publish_failed(job)

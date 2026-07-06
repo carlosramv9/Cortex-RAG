@@ -26,8 +26,13 @@ class VectorRepository(ABC):
         vector: Sequence[float],
         *,
         limit: int = 10,
+        filters: dict[str, object] | None = None,
     ) -> list[SearchResult]:
-        """Return the nearest points to ``vector``."""
+        """Return the nearest points to ``vector``.
+
+        ``filters`` is an exact-match payload filter (e.g. ``{"tenant_id": "acme"}``);
+        callers MUST scope searches by tenant to avoid cross-tenant leakage.
+        """
         raise NotImplementedError
 
     @abstractmethod

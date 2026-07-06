@@ -157,3 +157,34 @@ class ProcessingJobModel(TimestampMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_jobs_document_type", "document_id", "job_type"),)
+
+
+class ConversationModel(TimestampMixin, Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+
+
+class ConversationMessageModel(Base):
+    """A single immutable message; ``seq`` gives deterministic ordering."""
+
+    __tablename__ = "conversation_messages"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    conversation_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_messages_conversation_seq", "conversation_id", "seq", unique=True),
+    )

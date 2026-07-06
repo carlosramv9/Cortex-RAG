@@ -20,6 +20,7 @@ class ConversationId:
 class Message:
     """A single message within a conversation."""
 
+    id: UUID
     role: Role
     content: str
     created_at: datetime | None = None
@@ -30,5 +31,7 @@ class Conversation:
     """Aggregate root: an ordered history of messages."""
 
     id: ConversationId
+    tenant_id: str
     messages: list[Message] = field(default_factory=list)
     created_at: datetime | None = None
+    updated_at: datetime | None = None

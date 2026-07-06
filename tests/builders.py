@@ -11,9 +11,10 @@ from app.domain.documents.repositories import (
     DocumentRepository,
     ProcessingJobRepository,
 )
+from app.domain.documents.job_queue import JobQueue
 from app.domain.shared.event_publisher import EventPublisher
 from app.domain.storage.providers import StorageProvider
-from tests.fakes import CapturingEventPublisher, InMemoryStorage
+from tests.fakes import CapturingEventPublisher, InMemoryJobQueue, InMemoryStorage
 
 
 def build_upload_use_case(
@@ -23,10 +24,13 @@ def build_upload_use_case(
     storage: StorageProvider | None = None,
     events: EventPublisher | None = None,
     upload_settings: UploadSettings | None = None,
+    queue: JobQueue | None = None,
 ) -> UploadDocumentUseCase:
     """Assemble an UploadDocumentUseCase wired with a create-job use case."""
     events = events or CapturingEventPublisher()
-    create_job = CreateProcessingJobUseCase(jobs, events, ProcessingSettings())
+    create_job = CreateProcessingJobUseCase(
+        jobs, events, ProcessingSettings(), queue or InMemoryJobQueue()
+    )
     return UploadDocumentUseCase(
         documents,
         storage or InMemoryStorage(),

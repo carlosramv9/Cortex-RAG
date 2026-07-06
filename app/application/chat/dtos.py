@@ -17,6 +17,7 @@ class SourceReference(BaseModel):
 class AnswerQuestionInput(BaseModel):
     """Input to the answer-question use case."""
 
+    tenant_id: str
     question: str
     conversation_id: UUID | None = None
     top_k: int = 5

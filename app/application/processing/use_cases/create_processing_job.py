@@ -12,6 +12,7 @@ from uuid import uuid4
 from app.application.processing.dtos import CreateProcessingJobInput, JobView
 from app.config.settings import ProcessingSettings
 from app.domain.documents.events import ProcessingJobCreated
+from app.domain.documents.job_queue import JobQueue
 from app.domain.documents.jobs import ProcessingJob
 from app.domain.documents.repositories import ProcessingJobRepository
 from app.domain.shared.event_publisher import EventPublisher
@@ -27,10 +28,12 @@ class CreateProcessingJobUseCase:
         jobs: ProcessingJobRepository,
         events: EventPublisher,
         settings: ProcessingSettings,
+        queue: JobQueue,
     ) -> None:
         self._jobs = jobs
         self._events = events
         self._settings = settings
+        self._queue = queue
 
     async def execute(self, data: CreateProcessingJobInput) -> JobView:
         active = await self._jobs.get_active_by_type(data.document_id, data.job_type)
@@ -64,4 +67,5 @@ class CreateProcessingJobUseCase:
                 job_type=str(job.job_type),
             )
         )
+        await self._queue.enqueue(tenant_id=job.tenant_id, job_id=job.id)
         return JobView.from_entity(job)

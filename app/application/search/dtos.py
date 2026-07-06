@@ -10,6 +10,7 @@ from pydantic import BaseModel
 class SearchInput(BaseModel):
     """Input to the semantic-search use case."""
 
+    tenant_id: str
     query: str
     top_k: int = 10
 

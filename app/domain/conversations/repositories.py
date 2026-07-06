@@ -16,8 +16,8 @@ class ConversationRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get(self, conversation_id: ConversationId) -> Conversation | None:
-        """Return a conversation by id, or None if absent."""
+    async def get(self, tenant_id: str, conversation_id: ConversationId) -> Conversation | None:
+        """Return a tenant-scoped conversation by id, or None if absent."""
         raise NotImplementedError
 
     @abstractmethod

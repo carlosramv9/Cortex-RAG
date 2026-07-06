@@ -18,6 +18,12 @@ dependencies = [
     "alembic>=1.13.0",
     "structlog>=24.4.0",
     "httpx>=0.27.0",
+    "fastembed>=0.4.0",
+    "qdrant-client>=1.12.0",
+    "pymupdf>=1.24.0",
+    "langchain-text-splitters>=0.3.0",
+    "aio-pika>=9.4.0",
+    "google-genai>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -88,6 +94,17 @@ mypy_path = "app"
 
 [[tool.mypy.overrides]]
 module = ["asyncpg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastembed.*",
+    "qdrant_client.*",
+    "fitz.*",
+    "langchain_text_splitters.*",
+    "aio_pika.*",
+    "google.genai.*",
+]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------

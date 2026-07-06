@@ -14,6 +14,7 @@ from app.domain.shared.exceptions import (
     ConflictError,
     DomainError,
     EntityNotFoundError,
+    ServiceUnavailableError,
     ValidationError,
 )
 from app.shared.logging import get_logger
@@ -25,6 +26,7 @@ _STATUS_MAP: dict[type[DomainError], int] = {
     EntityNotFoundError: status.HTTP_404_NOT_FOUND,
     ValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ConflictError: status.HTTP_409_CONFLICT,
+    ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

@@ -38,6 +38,7 @@ from app.application.processing.use_cases.list_processing_jobs import (
 )
 from app.application.search.use_cases.semantic_search import SemanticSearchUseCase
 from app.config.settings import (
+    ChatSettings,
     ProcessingSettings,
     Settings,
     UploadSettings,
@@ -45,6 +46,7 @@ from app.config.settings import (
 )
 from app.domain.chunking.services import ChunkingStrategy
 from app.domain.conversations.repositories import ConversationRepository
+from app.domain.documents.job_queue import JobQueue
 from app.domain.documents.repositories import (
     DocumentRepository,
     ProcessingJobRepository,
@@ -56,9 +58,9 @@ from app.domain.shared.event_publisher import EventPublisher
 from app.domain.storage.providers import StorageProvider
 from app.domain.vector_store.repositories import VectorRepository
 from app.infrastructure.chunking.recursive_chunker import RecursiveChunkingStrategy
-from app.infrastructure.embeddings.ollama_provider import OllamaEmbeddingProvider
+from app.infrastructure.embeddings.fastembed_provider import FastEmbedEmbeddingProvider
 from app.infrastructure.events.logging_publisher import LoggingEventPublisher
-from app.infrastructure.llm.ollama_provider import OllamaLLMProvider
+from app.infrastructure.llm.gemini_provider import GeminiLLMProvider
 from app.infrastructure.parsers.pymupdf_parser import PyMuPDFParserProvider
 from app.infrastructure.persistence.sqlalchemy.repositories.conversation_repository import (
     SqlAlchemyConversationRepository,
@@ -70,6 +72,7 @@ from app.infrastructure.persistence.sqlalchemy.repositories.processing_job_repos
     SqlAlchemyProcessingJobRepository,
 )
 from app.infrastructure.persistence.sqlalchemy.session import Database
+from app.infrastructure.queue.rabbitmq_job_queue import RabbitMQJobQueue
 from app.infrastructure.storage.local_storage import LocalStorageProvider
 from app.infrastructure.vector_store.qdrant_repository import QdrantVectorRepository
 
@@ -98,6 +101,14 @@ def get_processing_settings(settings: SettingsDep) -> ProcessingSettings:
 
 
 ProcessingSettingsDep = Annotated[ProcessingSettings, Depends(get_processing_settings)]
+
+
+def get_chat_settings(settings: SettingsDep) -> ChatSettings:
+    """Provide the RAG chat settings."""
+    return settings.chat
+
+
+ChatSettingsDep = Annotated[ChatSettings, Depends(get_chat_settings)]
 
 
 # --- Request identity (multi-tenant) --------------------------------------
@@ -167,11 +178,11 @@ def get_storage_provider(settings: SettingsDep) -> StorageProvider:
 
 
 def get_embedding_provider(settings: SettingsDep) -> EmbeddingProvider:
-    return OllamaEmbeddingProvider(settings.llm.base_url, settings.embedding.model)
+    return FastEmbedEmbeddingProvider(settings.embedding.model)
 
 
 def get_llm_provider(settings: SettingsDep) -> LLMProvider:
-    return OllamaLLMProvider(settings.llm.base_url, settings.llm.model)
+    return GeminiLLMProvider(settings.gemini.api_key, settings.gemini.model)
 
 
 def get_vector_repository(settings: SettingsDep) -> VectorRepository:
@@ -179,6 +190,7 @@ def get_vector_repository(settings: SettingsDep) -> VectorRepository:
         settings.vector.host,
         settings.vector.port,
         settings.vector.collection,
+        settings.vector.vector_size,
     )
 
 
@@ -190,6 +202,11 @@ def get_chunking_strategy() -> ChunkingStrategy:
     return RecursiveChunkingStrategy()
 
 
+def get_job_queue(settings: SettingsDep) -> JobQueue:
+    return RabbitMQJobQueue(settings.rabbitmq.url, settings.rabbitmq.queue)
+
+
+JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
 DocumentRepositoryDep = Annotated[DocumentRepository, Depends(get_document_repository)]
 ConversationRepositoryDep = Annotated[ConversationRepository, Depends(get_conversation_repository)]
 ProcessingJobRepositoryDep = Annotated[
@@ -210,8 +227,9 @@ def get_create_processing_job_use_case(
     jobs: ProcessingJobRepositoryDep,
     events: EventPublisherDep,
     processing_settings: ProcessingSettingsDep,
+    queue: JobQueueDep,
 ) -> CreateProcessingJobUseCase:
-    return CreateProcessingJobUseCase(jobs, events, processing_settings)
+    return CreateProcessingJobUseCase(jobs, events, processing_settings, queue)
 
 
 CreateProcessingJobUseCaseDep = Annotated[
@@ -291,8 +309,9 @@ def get_answer_question_use_case(
     vectors: VectorRepositoryDep,
     llm: LLMProviderDep,
     conversations: ConversationRepositoryDep,
+    chat_settings: ChatSettingsDep,
 ) -> AnswerQuestionUseCase:
-    return AnswerQuestionUseCase(embeddings, vectors, llm, conversations)
+    return AnswerQuestionUseCase(embeddings, vectors, llm, conversations, chat_settings)
 
 
 def get_semantic_search_use_case(

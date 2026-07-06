@@ -65,18 +65,6 @@ async def test_get_active_ignores_terminal(
     assert await job_repo.get_active_by_type(doc_id, JobType.DOCUMENT_INGESTION) is None
 
 
-async def test_claim_queued_orders_by_priority_then_age(
-    job_repo: SqlAlchemyProcessingJobRepository,
-) -> None:
-    low = make_job(priority=0)
-    high = make_job(priority=10)
-    await job_repo.add(low)
-    await job_repo.add(high)
-
-    claimed = await job_repo.claim_queued(limit=10)
-    assert claimed[0].id == high.id  # higher priority first
-
-
 async def test_list_jobs_filters(
     job_repo: SqlAlchemyProcessingJobRepository,
 ) -> None:

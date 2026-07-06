@@ -1,22 +1,24 @@
-"""No-op ingestion worker.
+"""Ingestion worker.
 
-Placeholder for the future document-ingestion pipeline (parse -> render ->
-normalize -> chunk -> embed -> index). It performs no parsing/AI yet; it simply
-completes so the async pipeline is fully wired and observable end to end.
+Handles ``DOCUMENT_INGESTION`` jobs by delegating to ``ProcessDocumentUseCase``
+(parse -> chunk -> embed -> index). The worker itself only knows about the
+domain job contract; the actual pipeline lives in the application layer.
 """
 
 from __future__ import annotations
 
+from app.application.documents.use_cases.process_document import ProcessDocumentUseCase
 from app.domain.documents.jobs import JobType, ProcessingJob
 from app.workers.base import Worker
 
 
-class NoOpIngestionWorker(Worker):
-    """Handles DOCUMENT_INGESTION jobs (does no real work yet)."""
+class IngestionWorker(Worker):
+    """Handles DOCUMENT_INGESTION jobs by running the processing pipeline."""
 
     job_type = JobType.DOCUMENT_INGESTION
 
+    def __init__(self, process_document: ProcessDocumentUseCase) -> None:
+        self._process_document = process_document
+
     async def run(self, job: ProcessingJob) -> None:
-        # Real ingestion steps (parsing, rendering, chunking, embedding,
-        # indexing) will be implemented in later phases. No-op for now.
-        return None
+        await self._process_document.execute(job.tenant_id, job.document_id)

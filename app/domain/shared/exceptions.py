@@ -33,3 +33,10 @@ class ConflictError(DomainError):
     """Raised when an operation conflicts with current state."""
 
     default_message = "The operation conflicts with the current state."
+
+
+class ServiceUnavailableError(DomainError):
+    """Raised when an external dependency (e.g. an LLM provider) is
+    temporarily unavailable or rate-limited. Callers should retry later."""
+
+    default_message = "An external service is temporarily unavailable. Please try again shortly."

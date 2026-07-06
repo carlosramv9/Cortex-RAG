@@ -21,10 +21,3 @@ def test_openapi_available(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["info"]["title"]
-
-
-def test_feature_endpoints_return_501(client: TestClient) -> None:
-    """Unimplemented feature endpoints return 501."""
-    response = client.post("/api/v1/search", json={"query": "x", "top_k": 5})
-
-    assert response.status_code == 501

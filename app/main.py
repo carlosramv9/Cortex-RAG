@@ -9,9 +9,11 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api.errors import register_exception_handlers
@@ -60,6 +62,11 @@ def create_app() -> FastAPI:
     # Health lives at the root; feature endpoints are versioned under /api/v1.
     app.include_router(health_router)
     app.include_router(api_router, prefix=API_V1_PREFIX)
+
+    # Static web UI (same-origin chat client) served at /ui when present.
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if web_dir.is_dir():
+        app.mount("/ui", StaticFiles(directory=web_dir, html=True), name="ui")
 
     return app
 

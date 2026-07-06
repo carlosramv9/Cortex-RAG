@@ -141,8 +141,3 @@ class ProcessingJobRepository(ABC):
         offset: int = 0,
     ) -> tuple[list[ProcessingJob], int]:
         raise NotImplementedError
-
-    @abstractmethod
-    async def claim_queued(self, *, limit: int) -> list[ProcessingJob]:
-        """Return queued jobs ordered by priority desc, created_at asc."""
-        raise NotImplementedError

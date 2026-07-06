@@ -13,9 +13,35 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ./storage:/app/storage
+      # Persist the fastembed/HF model cache across rebuilds — /tmp is wiped
+      # on every container recreation and the model download takes ~90s.
+      - fastembed_cache:/tmp/fastembed_cache
     # host.docker.internal lets the container reach Ollama running on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: knowledge-worker
+    command: ["uv", "run", "python", "-m", "scripts.run_worker"]
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+      - fastembed_cache:/tmp/fastembed_cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -45,6 +71,25 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: knowledge-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672" # management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   qdrant_data:
+  rabbitmq_data:
+  fastembed_cache:

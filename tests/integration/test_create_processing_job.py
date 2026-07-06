@@ -18,14 +18,15 @@ from app.infrastructure.persistence.sqlalchemy.repositories.processing_job_repos
     SqlAlchemyProcessingJobRepository,
 )
 from app.shared.constants import ProcessingJobStatus
-from tests.fakes import CapturingEventPublisher
+from tests.fakes import CapturingEventPublisher, InMemoryJobQueue
 
 
 async def test_create_enqueues_and_emits_event(
     job_repo: SqlAlchemyProcessingJobRepository,
 ) -> None:
     events = CapturingEventPublisher()
-    uc = CreateProcessingJobUseCase(job_repo, events, ProcessingSettings())
+    queue = InMemoryJobQueue()
+    uc = CreateProcessingJobUseCase(job_repo, events, ProcessingSettings(), queue)
 
     view = await uc.execute(
         CreateProcessingJobInput(
@@ -37,12 +38,15 @@ async def test_create_enqueues_and_emits_event(
 
     assert view.status == ProcessingJobStatus.QUEUED
     assert isinstance(events.events[0], ProcessingJobCreated)
+    assert queue.enqueued == [("tenant-a", view.id)]
 
 
 async def test_only_one_active_job_per_type(
     job_repo: SqlAlchemyProcessingJobRepository,
 ) -> None:
-    uc = CreateProcessingJobUseCase(job_repo, CapturingEventPublisher(), ProcessingSettings())
+    uc = CreateProcessingJobUseCase(
+        job_repo, CapturingEventPublisher(), ProcessingSettings(), InMemoryJobQueue()
+    )
     doc_id = uuid4()
     data = CreateProcessingJobInput(
         tenant_id="tenant-a",
@@ -58,7 +62,9 @@ async def test_only_one_active_job_per_type(
 async def test_different_types_coexist(
     job_repo: SqlAlchemyProcessingJobRepository,
 ) -> None:
-    uc = CreateProcessingJobUseCase(job_repo, CapturingEventPublisher(), ProcessingSettings())
+    uc = CreateProcessingJobUseCase(
+        job_repo, CapturingEventPublisher(), ProcessingSettings(), InMemoryJobQueue()
+    )
     doc_id = uuid4()
     await uc.execute(
         CreateProcessingJobInput(

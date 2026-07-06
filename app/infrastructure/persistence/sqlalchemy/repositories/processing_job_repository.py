@@ -121,16 +121,3 @@ class SqlAlchemyProcessingJobRepository(ProcessingJobRepository):
         )
         models = (await self._session.execute(stmt)).scalars().all()
         return [_to_entity(m) for m in models], int(total)
-
-    async def claim_queued(self, *, limit: int) -> list[ProcessingJob]:
-        stmt = (
-            select(ProcessingJobModel)
-            .where(ProcessingJobModel.status == str(ProcessingJobStatus.QUEUED))
-            .order_by(
-                ProcessingJobModel.priority.desc(),
-                ProcessingJobModel.created_at.asc(),
-            )
-            .limit(limit)
-        )
-        models = (await self._session.execute(stmt)).scalars().all()
-        return [_to_entity(m) for m in models]

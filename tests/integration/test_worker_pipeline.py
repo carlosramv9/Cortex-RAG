@@ -13,11 +13,10 @@ from app.infrastructure.persistence.sqlalchemy.repositories.processing_job_repos
 )
 from app.shared.constants import ProcessingJobStatus
 from app.workers.base import Worker
-from app.workers.dispatcher import JobDispatcher
 from app.workers.executor import WorkerExecutor
 from app.workers.registry import WorkerRegistry
 from tests.factories import make_job
-from tests.fakes import CapturingEventPublisher
+from tests.fakes import CapturingEventPublisher, InMemoryJobQueue
 
 
 class _SuccessWorker(Worker):
@@ -46,7 +45,7 @@ async def test_executor_completes_job(
     job = make_job()
     await job_repo.add(job)
     events = CapturingEventPublisher()
-    executor = WorkerExecutor(job_repo, events, _registry(_SuccessWorker()))
+    executor = WorkerExecutor(job_repo, events, _registry(_SuccessWorker()), InMemoryJobQueue())
 
     result = await executor.execute(job)
 
@@ -68,7 +67,7 @@ async def test_executor_fails_without_worker(
     job = make_job()
     await job_repo.add(job)
     events = CapturingEventPublisher()
-    executor = WorkerExecutor(job_repo, events, WorkerRegistry())
+    executor = WorkerExecutor(job_repo, events, WorkerRegistry(), InMemoryJobQueue())
 
     result = await executor.execute(job)
 
@@ -82,7 +81,9 @@ async def test_executor_fails_terminally_when_no_retries(
     job = make_job()
     await job_repo.add(job)
     events = CapturingEventPublisher()
-    executor = WorkerExecutor(job_repo, events, _registry(_FailingWorker()), max_retries=0)
+    executor = WorkerExecutor(
+        job_repo, events, _registry(_FailingWorker()), InMemoryJobQueue(), max_retries=0
+    )
 
     result = await executor.execute(job)
 
@@ -97,30 +98,18 @@ async def test_executor_requeues_then_fails(
     job = make_job()
     await job_repo.add(job)
     events = CapturingEventPublisher()
-    executor = WorkerExecutor(job_repo, events, _registry(_FailingWorker()), max_retries=1)
+    queue = InMemoryJobQueue()
+    executor = WorkerExecutor(job_repo, events, _registry(_FailingWorker()), queue, max_retries=1)
 
-    # First run: fails but is re-queued (one retry allowed).
+    # First run: fails but is re-queued (one retry allowed) and re-enqueued.
     await executor.execute(job)
     assert job.status == ProcessingJobStatus.QUEUED
     assert job.retry_count == 1
     assert not any(isinstance(e, ProcessingJobFailed) for e in events.events)
+    assert queue.enqueued == [(job.tenant_id, job.id)]
 
-    # Second run: no retries left -> terminal FAILED + event.
+    # Second run: no retries left -> terminal FAILED + event, no further enqueue.
     await executor.execute(job)
     assert job.status == ProcessingJobStatus.FAILED
     assert any(isinstance(e, ProcessingJobFailed) for e in events.events)
-
-
-async def test_dispatcher_runs_all_queued(
-    job_repo: SqlAlchemyProcessingJobRepository,
-) -> None:
-    await job_repo.add(make_job())
-    await job_repo.add(make_job())
-    executor = WorkerExecutor(job_repo, CapturingEventPublisher(), _registry(_SuccessWorker()))
-    dispatcher = JobDispatcher(job_repo, executor, batch_size=10)
-
-    dispatched = await dispatcher.dispatch_pending()
-
-    assert dispatched == 2
-    _, remaining = await job_repo.list_jobs("tenant-a", status=ProcessingJobStatus.QUEUED)
-    assert remaining == 0
+    assert queue.enqueued == [(job.tenant_id, job.id)]
